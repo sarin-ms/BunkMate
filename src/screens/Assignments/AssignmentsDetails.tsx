@@ -30,6 +30,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { CustomLoader } from "../../components/UI/RefreshLoader";
 import Text from "../../components/UI/Text";
+import { ContentNode, parseHtmlContent } from "../../utils/htmlParser";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -54,6 +55,7 @@ export const AssignmentsDetailsScreen: React.FC = () => {
   const [selectedItem, setSelectedItem] = React.useState<{
     item: QA;
     index: number;
+    parsedContent: ContentNode[];
   } | null>(null);
   const [showPopup, setShowPopup] = React.useState(false);
 
@@ -77,23 +79,10 @@ export const AssignmentsDetailsScreen: React.FC = () => {
 
   const openPopup = React.useCallback(
     (item: QA, index: number) => {
-      const itemCopy = { ...item };
-      const content = itemCopy.question || itemCopy.text || "";
+      const questionText = item.question || item.text || "";
+      const parsedContent = parseHtmlContent(questionText);
 
-      const imgTagRegex = /<img[^>]+src="([^">]+)"[^>]*>/gi;
-      const urls: string[] = [];
-      let match: RegExpExecArray | null;
-
-      while ((match = imgTagRegex.exec(content)) !== null) {
-        if (match[1]) {
-          urls.push(match[1]);
-        }
-      }
-
-      setImgUri(urls);
-      itemCopy.question = content.replace(imgTagRegex, "");
-
-      setSelectedItem({ item: itemCopy, index });
+      setSelectedItem({ item, index, parsedContent });
       setShowPopup(true);
       overlayOpacity.value = withTiming(1, {
         duration: 150,
@@ -414,7 +403,7 @@ export const AssignmentsDetailsScreen: React.FC = () => {
                     showsVerticalScrollIndicator={true}
                   >
                     <>
-                      <Text
+                      {/* <Text
                         style={styles.popupQuestionText}
                         selectable={true}
                         key={"question-text"}
@@ -435,7 +424,33 @@ export const AssignmentsDetailsScreen: React.FC = () => {
                           }}
                           resizeMode="contain"
                         />
-                      ))}
+                      ))} */}
+                      {selectedItem.parsedContent.map((node, index) => {
+                        if (node.type === "text") {
+                          return (
+                            <Text
+                              style={styles.popupQuestionText}
+                              selectable={true}
+                              key={`content-node-${index}`}
+                            >
+                              {node.text}
+                            </Text>
+                          );
+                        }
+                        if (node.type === "image") {
+                          return (
+                            <Image
+                              source={{ uri: node.imgUrl }}
+                              key={`content-node-${index}`}
+                              style={{
+                                width: "100%",
+                                height: 200,
+                              }}
+                              resizeMode="contain"
+                            />
+                          );
+                        }
+                      })}
                     </>
                   </ScrollView>
                 </>
