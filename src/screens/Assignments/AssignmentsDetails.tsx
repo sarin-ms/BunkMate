@@ -8,6 +8,7 @@ import {
   Pressable,
   Dimensions,
   ScrollView,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
@@ -47,6 +48,7 @@ export const AssignmentsDetailsScreen: React.FC = () => {
   const [score, setScore] = React.useState({ totalScore: 0, totalMaxMarks: 0 });
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [imgUri, setImgUri] = React.useState<string[]>([]);
 
   // Popup state for long-press question details
   const [selectedItem, setSelectedItem] = React.useState<{
@@ -75,7 +77,23 @@ export const AssignmentsDetailsScreen: React.FC = () => {
 
   const openPopup = React.useCallback(
     (item: QA, index: number) => {
-      setSelectedItem({ item, index });
+      const itemCopy = { ...item };
+      const content = itemCopy.question || itemCopy.text || "";
+
+      const imgTagRegex = /<img[^>]+src="([^">]+)"[^>]*>/gi;
+      const urls: string[] = [];
+      let match: RegExpExecArray | null;
+
+      while ((match = imgTagRegex.exec(content)) !== null) {
+        if (match[1]) {
+          urls.push(match[1]);
+        }
+      }
+
+      setImgUri(urls);
+      itemCopy.question = content.replace(imgTagRegex, "");
+
+      setSelectedItem({ item: itemCopy, index });
       setShowPopup(true);
       overlayOpacity.value = withTiming(1, {
         duration: 150,
@@ -108,6 +126,7 @@ export const AssignmentsDetailsScreen: React.FC = () => {
       () => {
         runOnJS(setShowPopup)(false);
         runOnJS(setSelectedItem)(null);
+        runOnJS(setImgUri)([]);
       },
     );
   }, [overlayOpacity, popupScale, popupOpacity]);
@@ -334,10 +353,12 @@ export const AssignmentsDetailsScreen: React.FC = () => {
         onRequestClose={closePopup}
         statusBarTranslucent
       >
-        <Pressable style={styles.modalContainer} onPress={closePopup}>
-          <Animated.View style={[styles.overlay, overlayAnimatedStyle]} />
+        <View style={styles.modalContainer}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closePopup}>
+            <Animated.View style={[styles.overlay, overlayAnimatedStyle]} />
+          </Pressable>
           <Animated.View style={[styles.popupCard, popupAnimatedStyle]}>
-            <Pressable onPress={(e) => e.stopPropagation()}>
+            <View>
               {selectedItem && (
                 <>
                   <View style={styles.popupHeader}>
@@ -391,19 +412,37 @@ export const AssignmentsDetailsScreen: React.FC = () => {
                   <ScrollView
                     style={styles.popupScrollContent}
                     showsVerticalScrollIndicator={true}
-                    bounces={false}
                   >
-                    <Text style={styles.popupQuestionText}>
-                      {selectedItem.item.question ||
-                        selectedItem.item.text ||
-                        "No question content available"}
-                    </Text>
+                    <>
+                      <Text
+                        style={styles.popupQuestionText}
+                        selectable={true}
+                        key={"question-text"}
+                      >
+                        {selectedItem.item.question ||
+                          selectedItem.item.text ||
+                          "No question content available"}
+                      </Text>
+                      {imgUri.map((uri, index) => (
+                        <Image
+                          source={{ uri: uri }}
+                          key={`question-image-${index}`}
+                          style={{
+                            width: "100%",
+                            height: 200,
+                            marginTop: 16,
+                            borderRadius: 12,
+                          }}
+                          resizeMode="contain"
+                        />
+                      ))}
+                    </>
                   </ScrollView>
                 </>
               )}
-            </Pressable>
+            </View>
           </Animated.View>
-        </Pressable>
+        </View>
       </Modal>
     </View>
   );
