@@ -15,10 +15,14 @@ export const parseHtmlContent = (html: string): ContentNode[] => {
     const textContent = rawText
       .replace(htmlTagRegex, " ") // Replace tags with spaces, not empty strings
       .replace(/\s+/g, " ") // Normalize multiple spaces into one
+      .replace(/&nbsp;/g, " ") // Replace non-breaking spaces with regular spaces
+      .replace(/&amp;/g, "&") // Replace HTML entities with their character equivalents
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
       .trim();
 
     if (textContent) {
-      content.push({ type: "text", text: textContent.trim() });
+      content.push({ type: "text", text: textContent });
     }
   };
 
