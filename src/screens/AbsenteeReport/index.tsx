@@ -109,6 +109,7 @@ const ToPdfBtn = ({
         },
       ]}
       onPress={onPress}
+      activeOpacity={0.7}
     >
       <AnimatedIonicons
         name="document-text-outline"
