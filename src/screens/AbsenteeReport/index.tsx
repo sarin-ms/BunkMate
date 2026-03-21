@@ -125,7 +125,7 @@ export const AbsenteeReportScreen: React.FC = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const [selectedDates, setSelectedDates] = useState<Date[]>([new Date()]);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [reportData, setReportData] = useState<DateReport[]>([]);
   const [isCalendarVisible, setCalendarVisible] = useState(false);
 
