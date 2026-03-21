@@ -1,5 +1,6 @@
 const imgTagRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
 const htmlTagRegex = /<[^>]+>/g;
+const brTagRegex = /<br\s*\/?>/gi;
 
 export type ContentNode =
   | { type: "text"; text: string }
@@ -10,15 +11,18 @@ export const parseHtmlContent = (html: string): ContentNode[] => {
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
-  // Helper function to clean and push text
   const processAndPushText = (rawText: string) => {
     const textContent = rawText
-      .replace(htmlTagRegex, " ") // Replace tags with spaces, not empty strings
-      .replace(/\s+/g, " ") // Normalize multiple spaces into one
-      .replace(/&nbsp;/g, " ") // Replace non-breaking spaces with regular spaces
-      .replace(/&amp;/g, "&") // Replace HTML entities with their character equivalents
+      .replace(/[\r\n\t]+/g, " ")
+      .replace(brTagRegex, "\n")
+      .replace(htmlTagRegex, " ")
+      .replace(/&nbsp;/g, "\u00A0")
+      .replace(/&amp;/g, "&")
       .replace(/&lt;/g, "<")
       .replace(/&gt;/g, ">")
+      .replace(/ +/g, " ")
+      .replace(/ \n/g, "\n")
+      .replace(/\n /g, "\n")
       .trim();
 
     if (textContent) {
@@ -31,19 +35,15 @@ export const parseHtmlContent = (html: string): ContentNode[] => {
     const imgStartIndex = match.index;
     const imgEndIndex = imgTagRegex.lastIndex;
 
-    // 1. Add text content before the image tag
     if (imgStartIndex > lastIndex) {
       processAndPushText(html.substring(lastIndex, imgStartIndex));
     }
 
-    // 2. Add the image content
     content.push({ type: "image", imgUrl });
 
-    // 3. Update the index
     lastIndex = imgEndIndex;
   }
 
-  // BUG FIX: Catch any remaining text after the final image
   if (lastIndex < html.length) {
     processAndPushText(html.substring(lastIndex));
   }
