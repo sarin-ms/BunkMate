@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Modal,
   FlatList,
+  ScrollView,
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -29,24 +30,103 @@ import { normalizeAttendance } from "../../utils/helpers";
 import { Subject } from "../../types/api";
 import { TAB_BAR_HEIGHT } from "../../constants/config";
 import Text from "../../components/UI/Text";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { DateReport, AbsentSubject, openPdf } from "../../utils/absentee";
 
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 const CELL_SIZE = Math.floor((width * 0.9 - 40) / 7);
 
-interface AbsentSubject {
-  subjectId: string;
-  subjectName: string;
-  subjectCode: string;
-  absentHours: number[];
-}
+const AnimatedTouchableOpacity =
+  Animated.createAnimatedComponent(TouchableOpacity);
+
+const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
+
+const ToPdfBtn = ({
+  selectedDates,
+  reportData,
+  styles,
+  onPress,
+}: {
+  selectedDates: Date[];
+  reportData: DateReport[];
+  styles: ReturnType<typeof createStyles>;
+  onPress: () => void;
+}) => {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const isVisible = selectedDates.length > 0 && reportData.length > 0;
+
+  const borderWidth = useSharedValue(0);
+  const iconOpacity = useSharedValue(0);
+  const animStyle = useAnimatedStyle(() => {
+    return {
+      borderWidth: borderWidth.value,
+    };
+  }, []);
+
+  const iconAnimStyle = useAnimatedStyle(() => {
+    return {
+      opacity: iconOpacity.value,
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isVisible) {
+      iconOpacity.value = withTiming(1, {
+        duration: 500,
+        easing: Easing.in(Easing.ease),
+      });
+      borderWidth.value = withTiming(1.5, {
+        duration: 500,
+        easing: Easing.in(Easing.ease),
+      });
+    } else {
+      iconOpacity.value = withTiming(0, {
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+      });
+      borderWidth.value = withTiming(0, {
+        duration: 500,
+        easing: Easing.out(Easing.ease),
+      });
+    }
+  }, [isVisible]);
+
+  if (!isVisible) return null;
+  return (
+    <AnimatedTouchableOpacity
+      style={[
+        styles.toPdfBtn,
+        animStyle,
+        {
+          bottom: TAB_BAR_HEIGHT + 50,
+          right: insets.right + 10,
+        },
+      ]}
+      onPress={onPress}
+    >
+      <AnimatedIonicons
+        name="document-text-outline"
+        size={24}
+        color={colors.primary}
+        style={iconAnimStyle}
+      />
+    </AnimatedTouchableOpacity>
+  );
+};
 
 export const AbsenteeReportScreen: React.FC = () => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [reportData, setReportData] = useState<AbsentSubject[]>([]);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([new Date()]);
+  const [reportData, setReportData] = useState<DateReport[]>([]);
   const [isCalendarVisible, setCalendarVisible] = useState(false);
 
   const { courseSchedule, data: attendanceData } = useAttendanceStore();
@@ -67,75 +147,128 @@ export const AbsenteeReportScreen: React.FC = () => {
       return;
     }
 
-    const absenteeMap = new Map<string, AbsentSubject>();
+    const reports: DateReport[] = [];
 
-    courseSchedule.forEach((scheduleEntries, subjectId) => {
-      const subjectDetails = subjectMap.get(subjectId);
-      if (!subjectDetails) return;
+    // Sort selected dates chronologically
+    const sortedDates = [...selectedDates].sort(
+      (a, b) => a.getTime() - b.getTime(),
+    );
 
-      const absentHours: number[] = [];
+    for (const selectedDate of sortedDates) {
+      const absenteeMap = new Map<string, AbsentSubject>();
 
-      scheduleEntries.forEach((entry) => {
-        const entryDate = new Date(entry.year, entry.month - 1, entry.day);
-        if (isSameDay(selectedDate, entryDate)) {
-          const status = normalizeAttendance(
-            entry.final_attendance ||
-              entry.user_attendance ||
-              entry.teacher_attendance
-          );
+      courseSchedule.forEach((scheduleEntries, subjectId) => {
+        const subjectDetails = subjectMap.get(subjectId);
+        if (!subjectDetails) return;
 
-          if (status === "absent") {
-            absentHours.push(entry.hour);
+        const absentHours: number[] = [];
+
+        scheduleEntries.forEach((entry) => {
+          const entryDate = new Date(entry.year, entry.month - 1, entry.day);
+          if (isSameDay(selectedDate, entryDate)) {
+            const status = normalizeAttendance(
+              entry.final_attendance ||
+                entry.user_attendance ||
+                entry.teacher_attendance,
+            );
+
+            if (status === "absent") {
+              absentHours.push(entry.hour);
+            }
           }
+        });
+
+        if (absentHours.length > 0) {
+          absenteeMap.set(subjectId, {
+            subjectId,
+            subjectName: subjectDetails.name,
+            subjectCode: subjectDetails.code,
+            absentHours: absentHours.sort((a, b) => a - b),
+          });
         }
       });
 
-      if (absentHours.length > 0) {
-        absenteeMap.set(subjectId, {
-          subjectId,
-          subjectName: subjectDetails.name,
-          subjectCode: subjectDetails.code,
-          absentHours: absentHours.sort((a, b) => a - b),
-        });
+      reports.push({
+        date: selectedDate,
+        dateKey: format(selectedDate, "yyyy-MM-dd"),
+        subjects: Array.from(absenteeMap.values()),
+      });
+    }
+
+    setReportData(reports);
+  }, [selectedDates, courseSchedule, subjectMap]);
+
+  const onDateSelect = useCallback((date: Date) => {
+    setSelectedDates((prev) => {
+      const exists = prev.some((d) => isSameDay(d, date));
+      if (exists) {
+        const filtered = prev.filter((d) => !isSameDay(d, date));
+        return filtered.length > 0 ? filtered : prev;
       }
+      return [...prev, date];
     });
+  }, []);
 
-    setReportData(Array.from(absenteeMap.values()));
-  }, [selectedDate, courseSchedule, subjectMap]);
+  const removeDate = useCallback((date: Date) => {
+    setSelectedDates((prev) => {
+      const filtered = prev.filter((d) => !isSameDay(d, date));
+      return filtered;
+    });
+  }, []);
 
-  const onDateSelect = (date: Date) => {
-    setSelectedDate(date);
-    setCalendarVisible(false);
+  const handleGeneratePdf = async () => {
+    await openPdf(reportData);
   };
 
-  const renderReportItem = ({ item }: { item: AbsentSubject }) => (
-    <View style={styles.reportItemCard}>
-      <View style={styles.reportItemHeader}>
-        <View style={styles.subjectTextContainer}>
-          <Text style={styles.subjectName}>{item.subjectName}</Text>
-          <Text style={styles.subjectCode}>{item.subjectCode}</Text>
-        </View>
+  const renderDateSection = ({ item }: { item: DateReport }) => (
+    <View style={styles.dateSectionContainer}>
+      <View style={styles.dateSectionHeader}>
+        <View style={styles.dateSectionDot} />
+        <Text style={styles.dateSectionTitle}>
+          {format(item.date, "EEEE, do MMMM yyyy")}
+        </Text>
       </View>
-      <View style={styles.divider} />
-      <View style={styles.hoursContainer}>
-        <View style={styles.hoursLabelContainer}>
-          <Ionicons
-            name="time-outline"
-            size={16}
-            color={colors.textSecondary}
-          />
-          <Text style={styles.hoursLabel}>
-            Missed period{item.absentHours.length > 1 ? "s" : ""}
-          </Text>
-        </View>
-        <View style={styles.hoursListContainer}>
-          {item.absentHours.map((hour, index) => (
-            <View key={index} style={styles.hourBubble}>
-              <Text style={styles.hourBubbleText}>{hour}</Text>
+      {item.subjects.length > 0 ? (
+        item.subjects.map((subject) => (
+          <View key={subject.subjectId} style={styles.reportItemCard}>
+            <View style={styles.reportItemHeader}>
+              <View style={styles.subjectTextContainer}>
+                <Text style={styles.subjectName}>{subject.subjectName}</Text>
+                <Text style={styles.subjectCode}>{subject.subjectCode}</Text>
+              </View>
             </View>
-          ))}
+            <View style={styles.divider} />
+            <View style={styles.hoursContainer}>
+              <View style={styles.hoursLabelContainer}>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.hoursLabel}>
+                  Missed period{subject.absentHours.length > 1 ? "s" : ""}
+                </Text>
+              </View>
+              <View style={styles.hoursListContainer}>
+                {subject.absentHours.map((hour, index) => (
+                  <View key={index} style={styles.hourBubble}>
+                    <Text style={styles.hourBubbleText}>{hour}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        ))
+      ) : (
+        <View style={styles.dateEmptyCard}>
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={28}
+            color={colors.success}
+          />
+          <Text style={styles.dateEmptyText}>No absences on this date</Text>
         </View>
-      </View>
+      )}
     </View>
   );
 
@@ -148,7 +281,7 @@ export const AbsenteeReportScreen: React.FC = () => {
       />
       <Text style={styles.emptyTitle}>All Clear!</Text>
       <Text style={styles.emptyMessage}>
-        No absences recorded for {format(selectedDate, "do MMMM yyyy")}.
+        No absences recorded for the selected dates.
       </Text>
     </View>
   );
@@ -168,15 +301,45 @@ export const AbsenteeReportScreen: React.FC = () => {
         >
           <Ionicons name="calendar-outline" size={20} color={colors.primary} />
           <Text style={styles.dateSelectorText}>
-            {format(selectedDate, "dd/MM/yyyy")}
+            {selectedDates.length === 1
+              ? format(selectedDates[0], "dd/MM/yyyy")
+              : `${selectedDates.length} dates selected`}
           </Text>
+          <Ionicons name="chevron-down" size={16} color={colors.primary} />
         </TouchableOpacity>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.selectedDatesScroll}
+          contentContainerStyle={styles.selectedDatesContainer}
+        >
+          {[...selectedDates]
+            .sort((a, b) => a.getTime() - b.getTime())
+            .map((date) => (
+              <View key={date.toISOString()} style={styles.selectedDateChip}>
+                <Text style={styles.selectedDateChipText}>
+                  {format(date, "dd MMM")}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => removeDate(date)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={16}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
+        </ScrollView>
       </View>
 
       <FlatList
         data={reportData}
-        renderItem={renderReportItem}
-        keyExtractor={(item) => item.subjectId}
+        renderItem={renderDateSection}
+        keyExtractor={(item) => item.dateKey}
         contentContainerStyle={{
           paddingBottom: insets.bottom + TAB_BAR_HEIGHT,
           paddingHorizontal: 16,
@@ -189,7 +352,13 @@ export const AbsenteeReportScreen: React.FC = () => {
         visible={isCalendarVisible}
         onClose={() => setCalendarVisible(false)}
         onDateSelect={onDateSelect}
-        currentDate={selectedDate}
+        selectedDates={selectedDates}
+      />
+      <ToPdfBtn
+        onPress={handleGeneratePdf}
+        styles={styles}
+        reportData={reportData}
+        selectedDates={selectedDates}
       />
     </View>
   );
@@ -199,18 +368,22 @@ interface CalendarModalProps {
   visible: boolean;
   onClose: () => void;
   onDateSelect: (date: Date) => void;
-  currentDate: Date;
+  selectedDates: Date[];
 }
 
 const CalendarModal: React.FC<CalendarModalProps> = ({
   visible,
   onClose,
   onDateSelect,
-  currentDate,
+  selectedDates,
 }) => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
-  const [displayMonth, setDisplayMonth] = useState(currentDate);
+  const [displayMonth, setDisplayMonth] = useState(
+    selectedDates.length > 0
+      ? selectedDates[selectedDates.length - 1]
+      : new Date(),
+  );
 
   const calendarWeeks = useMemo(() => {
     const monthStart = startOfMonth(displayMonth);
@@ -222,10 +395,10 @@ const CalendarModal: React.FC<CalendarModalProps> = ({
       const weekEnd = endOfWeek(currentWeekStart);
       const days = eachDayOfInterval({ start: currentWeekStart, end: weekEnd });
       weeks.push(
-        days.map((day) => (day >= monthStart && day <= monthEnd ? day : null))
+        days.map((day) => (day >= monthStart && day <= monthEnd ? day : null)),
       );
       currentWeekStart = new Date(
-        currentWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000
+        currentWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000,
       );
     }
     return weeks;
@@ -237,7 +410,7 @@ const CalendarModal: React.FC<CalendarModalProps> = ({
         <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.cell} />
       );
     }
-    const isSelected = isSameDay(day, currentDate);
+    const isSelected = selectedDates.some((d) => isSameDay(d, day));
     const isTodayDate = isToday(day);
 
     return (
@@ -310,13 +483,13 @@ const CalendarModal: React.FC<CalendarModalProps> = ({
                       {day.charAt(0)}
                     </Text>
                   </View>
-                )
+                ),
               )}
             </View>
             {calendarWeeks.map((week, weekIndex) => (
               <View key={weekIndex} style={styles.weekRow}>
                 {week.map((day, dayIndex) =>
-                  renderDay(day, weekIndex, dayIndex)
+                  renderDay(day, weekIndex, dayIndex),
                 )}
               </View>
             ))}
@@ -332,6 +505,7 @@ const createStyles = (colors: ThemeColors) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      position: "relative",
     },
     header: {
       paddingHorizontal: 20,
@@ -420,7 +594,7 @@ const createStyles = (colors: ThemeColors) =>
     countBadgeText: {
       fontSize: 15,
       fontWeight: "700",
-      color: "#FFFFFF",
+      color: colors.text,
     },
     divider: {
       height: 1,
@@ -479,6 +653,69 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: "center",
       marginTop: 8,
     },
+    selectedDatesScroll: {
+      marginTop: 10,
+      maxHeight: 40,
+      minHeight: 30,
+    },
+    selectedDatesContainer: {
+      flexDirection: "row",
+      gap: 8,
+      paddingVertical: 2,
+    },
+    selectedDateChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: colors.primary + "18",
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: colors.primary + "30",
+    },
+    selectedDateChipText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: colors.primary,
+    },
+    dateSectionContainer: {
+      marginBottom: 20,
+    },
+    dateSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 12,
+      paddingVertical: 4,
+    },
+    dateSectionDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+    },
+    dateSectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: colors.text,
+      letterSpacing: 0.2,
+    },
+    dateEmptyCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border + "40",
+    },
+    dateEmptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      fontWeight: "500",
+    },
     modalOverlay: {
       flex: 1,
       backgroundColor: colors.background + "80",
@@ -490,7 +727,7 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 16,
-      shadowColor: "#000",
+      shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
@@ -563,7 +800,18 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.primary,
     },
     selectedDayText: {
-      color: "#FFFFFF",
+      color: colors.text,
       fontWeight: "bold",
+    },
+    toPdfBtn: {
+      position: "absolute",
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderStyle: "dashed",
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
     },
   });
