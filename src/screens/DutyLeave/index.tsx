@@ -12,10 +12,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
+
 import {
   format,
   startOfMonth,
@@ -31,6 +33,9 @@ import {
 } from "date-fns";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import * as Sharing from "expo-sharing";
+import * as IntentLauncher from "expo-intent-launcher";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { useThemedStyles, useTheme } from "../../hooks/useTheme";
 import { useAttendanceStore } from "../../state/attendance";
@@ -144,6 +149,38 @@ const DutyLeaveCard: React.FC<{
 }> = ({ leave, onDelete, onUpdate, onEdit, hasCoverage = true }) => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
+  const [imagePreviewVisible, setImagePreviewVisible] = useState(false);
+
+  const handleOpenDocument = async () => {
+    if (!leave.documentUri) return;
+
+    if (leave.documentType === "image") {
+      setImagePreviewVisible(true);
+    } else {
+      try {
+        if (Platform.OS === "android") {
+          const contentUri = await FileSystem.getContentUriAsync(
+            leave.documentUri,
+          );
+          await IntentLauncher.startActivityAsync(
+            "android.intent.action.VIEW",
+            {
+              data: contentUri,
+              flags: 1,
+              type: "application/pdf",
+            },
+          );
+        } else {
+          await Sharing.shareAsync(leave.documentUri, {
+            mimeType: "application/pdf",
+            dialogTitle: leave.documentName || "Open Document",
+          });
+        }
+      } catch (error) {
+        Alert.alert("Error", "Could not open the document.");
+      }
+    }
+  };
 
   const handleDelete = () => {
     Alert.alert(
@@ -160,7 +197,7 @@ const DutyLeaveCard: React.FC<{
     );
   };
 
-  return (
+  const cardContent = (
     <Animated.View
       entering={SlideInDown.duration(300).springify()}
       style={styles.leaveCard}
@@ -188,7 +225,11 @@ const DutyLeaveCard: React.FC<{
               : `Hours: ${[...leave.hours].sort().join(", ")}`}
           </Text>
           {leave.documentUri && (
-            <View style={styles.leaveCardDocBadge}>
+            <TouchableOpacity
+              style={styles.leaveCardDocBadge}
+              onPress={handleOpenDocument}
+              activeOpacity={0.7}
+            >
               <Ionicons
                 name={
                   leave.documentType === "pdf"
@@ -201,7 +242,12 @@ const DutyLeaveCard: React.FC<{
               <Text style={styles.leaveCardDocText} numberOfLines={1}>
                 {leave.documentName || "Document attached"}
               </Text>
-            </View>
+              <Ionicons
+                name="open-outline"
+                size={12}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
           )}
           {hasCoverage === false && (
             <View style={styles.leaveCardWarning}>
@@ -249,6 +295,42 @@ const DutyLeaveCard: React.FC<{
         </View>
       </View>
     </Animated.View>
+  );
+
+  return (
+    <>
+      {cardContent}
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={imagePreviewVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImagePreviewVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.imagePreviewOverlay}>
+          <View style={styles.imagePreviewHeader}>
+            <Text style={styles.imagePreviewTitle} numberOfLines={1}>
+              {leave.documentName || "Image"}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setImagePreviewVisible(false)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close-circle" size={30} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          {leave.documentUri && (
+            <Image
+              source={{ uri: leave.documentUri }}
+              style={styles.imagePreviewImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+    </>
   );
 };
 
@@ -1544,5 +1626,35 @@ const createStyles = (colors: ThemeColors) =>
     selectedDayText: {
       color: "#fff",
       fontWeight: "700",
+    },
+
+    imagePreviewOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0,0,0,0.95)",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    imagePreviewHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      width: "100%",
+      paddingHorizontal: 20,
+      paddingTop: 50,
+      paddingBottom: 16,
+      position: "absolute",
+      top: 0,
+      zIndex: 10,
+    },
+    imagePreviewTitle: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "600",
+      flex: 1,
+      marginRight: 16,
+    },
+    imagePreviewImage: {
+      width: "100%",
+      height: "80%",
     },
   });
