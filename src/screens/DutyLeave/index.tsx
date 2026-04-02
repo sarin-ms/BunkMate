@@ -242,11 +242,7 @@ const DutyLeaveCard: React.FC<{
               <Text style={styles.leaveCardDocText} numberOfLines={1}>
                 {leave.documentName || "Document attached"}
               </Text>
-              <Ionicons
-                name="open-outline"
-                size={12}
-                color={colors.primary}
-              />
+              <Ionicons name="open-outline" size={12} color={colors.primary} />
             </TouchableOpacity>
           )}
           {hasCoverage === false && (
@@ -562,11 +558,20 @@ const AddDutyLeaveModal: React.FC<{
 
     try {
       let savedDocUri: string | undefined;
-      if (documentUri && documentName) {
-        savedDocUri = await DutyLeaveDatabase.saveDocument(
-          documentUri,
-          documentName,
-        );
+
+      if (editingLeave && documentUri === editingLeave.documentUri) {
+        savedDocUri = editingLeave.documentUri;
+      } else {
+        if (editingLeave?.documentUri) {
+          await DutyLeaveDatabase.deleteDocument(editingLeave.documentUri);
+        }
+
+        if (documentUri && documentName) {
+          savedDocUri = await DutyLeaveDatabase.saveDocument(
+            documentUri,
+            documentName,
+          );
+        }
       }
 
       onSave({
@@ -576,7 +581,7 @@ const AddDutyLeaveModal: React.FC<{
         documentName,
         documentType,
         hours: isFullDay ? "full_day" : selectedHours,
-        approved: false,
+        approved: editingLeave ? editingLeave.approved : false,
       });
       handleClose();
     } catch (error) {
@@ -1030,14 +1035,11 @@ export const DutyLeaveScreen: React.FC = () => {
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Attendance Impact Card - rendered outside FlatList for reliable reactivity */}
-      {attendanceData &&
-        dutyLeaves.length > 0 &&
-        subjectImpacts.length > 0 && (
-          <View style={{ paddingHorizontal: 16 }}>
-            <AttendanceImpactCard impacts={subjectImpacts} />
-          </View>
-        )}
+      {attendanceData && dutyLeaves.length > 0 && subjectImpacts.length > 0 && (
+        <View style={{ paddingHorizontal: 16 }}>
+          <AttendanceImpactCard impacts={subjectImpacts} />
+        </View>
+      )}
 
       <FlatList
         data={dutyLeaves}

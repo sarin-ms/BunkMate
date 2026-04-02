@@ -72,16 +72,7 @@ export class DutyLeaveDatabase {
     try {
       const leave = await this.getDutyLeave(id);
       if (leave?.documentUri) {
-        try {
-          const fileInfo = await FileSystem.getInfoAsync(leave.documentUri);
-          if (fileInfo.exists) {
-            await FileSystem.deleteAsync(leave.documentUri, {
-              idempotent: true,
-            });
-          }
-        } catch (fileError) {
-          console.warn("Failed to delete document file:", fileError);
-        }
+        await this.deleteDocument(leave.documentUri);
       }
 
       const key = `${DUTY_LEAVE_PREFIX}${id}`;
@@ -129,6 +120,17 @@ export class DutyLeaveDatabase {
     } catch (error) {
       console.error("Error saving document:", error);
       throw error;
+    }
+  }
+
+  static async deleteDocument(uri: string): Promise<void> {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (fileInfo.exists) {
+        await FileSystem.deleteAsync(uri, { idempotent: true });
+      }
+    } catch (error) {
+      console.warn("Failed to delete document file:", error);
     }
   }
 }
