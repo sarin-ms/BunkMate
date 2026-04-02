@@ -30,6 +30,7 @@ import {
   startOfWeek,
   endOfWeek,
   isSameMonth,
+  parseISO,
 } from "date-fns";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
@@ -43,23 +44,13 @@ import { useDutyLeaveStore } from "../../state/dutyLeave";
 import { DutyLeaveDatabase } from "../../utils/dutyLeaveDatabase";
 import { ThemeColors } from "../../types/theme";
 import { DutyLeave } from "../../types/dutyLeave";
-import { TAB_BAR_HEIGHT } from "../../constants/config";
 import {
   formatPercentage,
   calculateEnhancedAttendanceStats,
   normalizeAttendance,
 } from "../../utils/helpers";
 import Text from "../../components/UI/Text";
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeOut,
-  SlideInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
 
 const { width } = Dimensions.get("window");
 const CELL_SIZE = Math.floor((width * 0.9 - 40) / 7);
@@ -185,7 +176,7 @@ const DutyLeaveCard: React.FC<{
   const handleDelete = () => {
     Alert.alert(
       "Delete Duty Leave",
-      `Remove duty leave for ${format(new Date(leave.date), "dd MMM yyyy")}?`,
+      `Remove duty leave for ${format(parseISO(leave.date), "dd MMM yyyy")}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -205,16 +196,16 @@ const DutyLeaveCard: React.FC<{
       <View style={styles.leaveCardHeader}>
         <View style={styles.leaveCardDateBadge}>
           <Text style={styles.leaveCardDay}>
-            {format(new Date(leave.date), "dd")}
+            {format(parseISO(leave.date), "dd")}
           </Text>
           <Text style={styles.leaveCardMonth}>
-            {format(new Date(leave.date), "MMM")}
+            {format(parseISO(leave.date), "MMM")}
           </Text>
         </View>
 
         <View style={styles.leaveCardContent}>
           <Text style={styles.leaveCardDateFull}>
-            {format(new Date(leave.date), "EEEE, do MMMM yyyy")}
+            {format(parseISO(leave.date), "EEEE, do MMMM yyyy")}
           </Text>
           <Text style={styles.leaveCardReason} numberOfLines={2}>
             {leave.reason}
@@ -462,7 +453,7 @@ const CalendarModal: React.FC<{
 const AddDutyLeaveModal: React.FC<{
   visible: boolean;
   onClose: () => void;
-  onSave: (leave: Omit<DutyLeave, "id" | "createdAt">) => void;
+  onSave: (leave: Omit<DutyLeave, "id" | "createdAt">) => Promise<void>;
   editingLeave?: DutyLeave | null;
 }> = ({ visible, onClose, onSave, editingLeave }) => {
   const styles = useThemedStyles(createStyles);
@@ -481,7 +472,7 @@ const AddDutyLeaveModal: React.FC<{
 
   useEffect(() => {
     if (editingLeave && visible) {
-      setSelectedDate(new Date(editingLeave.date));
+      setSelectedDate(parseISO(editingLeave.date));
       setReason(editingLeave.reason);
       setDocumentUri(editingLeave.documentUri);
       setDocumentName(editingLeave.documentName);
@@ -574,7 +565,7 @@ const AddDutyLeaveModal: React.FC<{
         }
       }
 
-      onSave({
+      await onSave({
         date: format(selectedDate, "yyyy-MM-dd"),
         reason: reason.trim(),
         documentUri: savedDocUri,

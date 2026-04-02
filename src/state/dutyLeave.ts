@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { parseISO } from "date-fns";
 import { DutyLeave } from "../types/dutyLeave";
 import { DutyLeaveDatabase } from "../utils/dutyLeaveDatabase";
 
@@ -37,7 +38,7 @@ export const useDutyLeaveStore = create<DutyLeaveState>((set, get) => ({
       await DutyLeaveDatabase.saveDutyLeave(leave);
       set((state) => ({
         dutyLeaves: [leave, ...state.dutyLeaves].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+          (a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime(),
         ),
       }));
     } catch (error: any) {
@@ -70,7 +71,7 @@ export const useDutyLeaveStore = create<DutyLeaveState>((set, get) => ({
       const newLeaves = [...currentLeaves];
       newLeaves[leaveIndex] = updatedLeave;
       newLeaves.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        (a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime(),
       );
       set({ dutyLeaves: newLeaves });
     } catch (error: any) {

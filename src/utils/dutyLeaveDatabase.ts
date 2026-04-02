@@ -1,6 +1,7 @@
 import { database } from "../db/database";
 import { DutyLeave } from "../types/dutyLeave";
 import * as FileSystem from "expo-file-system/legacy";
+import { parseISO } from "date-fns";
 
 const DUTY_LEAVE_PREFIX = "duty_leave_";
 
@@ -44,13 +45,10 @@ export class DutyLeaveDatabase {
           if (data) {
             const leave = JSON.parse(data) as DutyLeave;
             if (leave.hours === undefined) {
-              if (leave.documentUri) {
-                await this.deleteDocument(leave.documentUri);
-              }
-              await database.delete(key);
-            } else {
-              leaves.push(leave);
+              leave.hours = "full_day";
+              await database.set(key, JSON.stringify(leave));
             }
+            leaves.push(leave);
           }
         } catch (parseError) {
           console.warn(
@@ -61,7 +59,7 @@ export class DutyLeaveDatabase {
       }
 
       leaves.sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+        (a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime(),
       );
 
       return leaves;
