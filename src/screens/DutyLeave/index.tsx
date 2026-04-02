@@ -139,8 +139,9 @@ const DutyLeaveCard: React.FC<{
   leave: DutyLeave;
   onDelete: (id: string) => void;
   onUpdate: (id: string, updates: Partial<DutyLeave>) => void;
+  onEdit: (leave: DutyLeave) => void;
   hasCoverage?: boolean;
-}> = ({ leave, onDelete, onUpdate, hasCoverage = true }) => {
+}> = ({ leave, onDelete, onUpdate, onEdit, hasCoverage = true }) => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
 
@@ -230,6 +231,13 @@ const DutyLeaveCard: React.FC<{
               size={22}
               color={leave.approved ? colors.success : colors.textSecondary}
             />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onEdit(leave)}
+            style={styles.leaveCardDeleteBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="create-outline" size={18} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDelete}
@@ -377,7 +385,8 @@ const AddDutyLeaveModal: React.FC<{
   visible: boolean;
   onClose: () => void;
   onSave: (leave: Omit<DutyLeave, "id" | "createdAt">) => void;
-}> = ({ visible, onClose, onSave }) => {
+  editingLeave?: DutyLeave | null;
+}> = ({ visible, onClose, onSave, editingLeave }) => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -391,6 +400,23 @@ const AddDutyLeaveModal: React.FC<{
   const [isSaving, setIsSaving] = useState(false);
   const [isFullDay, setIsFullDay] = useState(true);
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (editingLeave && visible) {
+      setSelectedDate(new Date(editingLeave.date));
+      setReason(editingLeave.reason);
+      setDocumentUri(editingLeave.documentUri);
+      setDocumentName(editingLeave.documentName);
+      setDocumentType(editingLeave.documentType);
+      if (editingLeave.hours === "full_day") {
+        setIsFullDay(true);
+        setSelectedHours([]);
+      } else {
+        setIsFullDay(false);
+        setSelectedHours([...editingLeave.hours]);
+      }
+    }
+  }, [editingLeave, visible]);
 
   const resetForm = () => {
     setSelectedDate(null);
@@ -500,7 +526,9 @@ const AddDutyLeaveModal: React.FC<{
             <View style={styles.addModalContent}>
               {/* Header */}
               <View style={styles.addModalHeader}>
-                <Text style={styles.addModalTitle}>Add Duty Leave</Text>
+                <Text style={styles.addModalTitle}>
+                  {editingLeave ? "Edit Duty Leave" : "Add Duty Leave"}
+                </Text>
                 <TouchableOpacity onPress={handleClose} activeOpacity={0.7}>
                   <Ionicons
                     name="close-circle"
@@ -706,7 +734,9 @@ const AddDutyLeaveModal: React.FC<{
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                    <Text style={styles.saveButtonText}>Save Duty Leave</Text>
+                    <Text style={styles.saveButtonText}>
+                      {editingLeave ? "Update Duty Leave" : "Save Duty Leave"}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -859,15 +889,29 @@ export const DutyLeaveScreen: React.FC = () => {
     return map;
   }, [attendanceData, courseSchedule, dutyLeaves]);
 
+  const [editingLeave, setEditingLeave] = useState<DutyLeave | null>(null);
+
   const handleAddDutyLeave = async (
     data: Omit<DutyLeave, "id" | "createdAt">,
   ) => {
-    const newLeave: DutyLeave = {
-      ...data,
-      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: Date.now(),
-    };
-    await addDutyLeave(newLeave);
+    if (editingLeave) {
+      await updateDutyLeave(editingLeave.id, {
+        ...data,
+      });
+      setEditingLeave(null);
+    } else {
+      const newLeave: DutyLeave = {
+        ...data,
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        createdAt: Date.now(),
+      };
+      await addDutyLeave(newLeave);
+    }
+  };
+
+  const handleEditDutyLeave = (leave: DutyLeave) => {
+    setEditingLeave(leave);
+    setAddModalVisible(true);
   };
 
   const handleDeleteDutyLeave = async (id: string) => {
@@ -904,6 +948,15 @@ export const DutyLeaveScreen: React.FC = () => {
         <View style={{ width: 40 }} />
       </View>
 
+      {/* Attendance Impact Card - rendered outside FlatList for reliable reactivity */}
+      {attendanceData &&
+        dutyLeaves.length > 0 &&
+        subjectImpacts.length > 0 && (
+          <View style={{ paddingHorizontal: 16 }}>
+            <AttendanceImpactCard impacts={subjectImpacts} />
+          </View>
+        )}
+
       <FlatList
         data={dutyLeaves}
         renderItem={({ item }) => (
@@ -911,35 +964,26 @@ export const DutyLeaveScreen: React.FC = () => {
             leave={item}
             onDelete={handleDeleteDutyLeave}
             onUpdate={updateDutyLeave}
+            onEdit={handleEditDutyLeave}
             hasCoverage={leaveCoverageMap[item.id] !== false}
           />
         )}
         keyExtractor={(item) => item.id}
-        extraData={[subjectImpacts, leaveCoverageMap]}
+        extraData={leaveCoverageMap}
         contentContainerStyle={{
           paddingHorizontal: 16,
           paddingBottom: insets.bottom + 100,
           flexGrow: 1,
         }}
         ListHeaderComponent={
-          <>
-            {/* Attendance Impact Card */}
-            {attendanceData &&
-              dutyLeaves.length > 0 &&
-              subjectImpacts.length > 0 && (
-                <AttendanceImpactCard impacts={subjectImpacts} />
-              )}
-
-            {/* Section header */}
-            {dutyLeaves.length > 0 && (
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionDot} />
-                <Text style={styles.sectionTitle}>
-                  Your Duty Leaves ({dutyLeaves.length})
-                </Text>
-              </View>
-            )}
-          </>
+          dutyLeaves.length > 0 ? (
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionDot} />
+              <Text style={styles.sectionTitle}>
+                Your Duty Leaves ({dutyLeaves.length})
+              </Text>
+            </View>
+          ) : null
         }
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
@@ -957,8 +1001,12 @@ export const DutyLeaveScreen: React.FC = () => {
       {/* Add Modal */}
       <AddDutyLeaveModal
         visible={addModalVisible}
-        onClose={() => setAddModalVisible(false)}
+        onClose={() => {
+          setAddModalVisible(false);
+          setEditingLeave(null);
+        }}
         onSave={handleAddDutyLeave}
+        editingLeave={editingLeave}
       />
     </View>
   );
