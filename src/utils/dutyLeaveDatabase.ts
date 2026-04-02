@@ -44,6 +44,9 @@ export class DutyLeaveDatabase {
           if (data) {
             const leave = JSON.parse(data) as DutyLeave;
             if (leave.hours === undefined) {
+              if (leave.documentUri) {
+                await this.deleteDocument(leave.documentUri);
+              }
               await database.delete(key);
             } else {
               leaves.push(leave);

@@ -865,10 +865,28 @@ export const DutyLeaveScreen: React.FC = () => {
     fetchDutyLeaves();
   }, []);
 
-  const subjectImpacts = useMemo(() => {
-    if (!attendanceData || !courseSchedule) return [];
+  const { subjectImpacts, leaveCoverageMap } = useMemo(() => {
+    const map: Record<string, boolean> = {};
+    const impacts: {
+      subjectName: string;
+      currentPercentage: number;
+      projectedPercentage: number;
+      matchingAbsentCount: number;
+    }[] = [];
 
-    const impacts = [];
+    if (!attendanceData || !courseSchedule) {
+      return { subjectImpacts: impacts, leaveCoverageMap: map };
+    }
+
+    const dutyLeavesByDate = new Map<string, DutyLeave[]>();
+    for (const leave of dutyLeaves) {
+      const dateStr = leave.date;
+      if (!dutyLeavesByDate.has(dateStr)) {
+        dutyLeavesByDate.set(dateStr, []);
+      }
+      dutyLeavesByDate.get(dateStr)!.push(leave);
+      map[leave.id] = false; // Initialize coverage map to false
+    }
 
     for (const subject of attendanceData.subjects) {
       const records = courseSchedule.get(subject.subject.id.toString()) || [];
@@ -881,34 +899,31 @@ export const DutyLeaveScreen: React.FC = () => {
 
       let matchingAbsentCount = 0;
 
-      for (const leave of dutyLeaves) {
-        const leaveDate = new Date(leave.date);
-        const leaveDay = leaveDate.getDate();
-        const leaveMonth = leaveDate.getMonth() + 1;
-        const leaveYear = leaveDate.getFullYear();
+      for (const entry of records) {
+        const status = normalizeAttendance(
+          entry.final_attendance ||
+            entry.user_attendance ||
+            entry.teacher_attendance,
+        );
 
-        for (const entry of records) {
-          if (
-            entry.day === leaveDay &&
-            entry.month === leaveMonth &&
-            entry.year === leaveYear
-          ) {
-            let isCovered = false;
-            if (leave.hours === "full_day") {
-              isCovered = true;
-            } else if (Array.isArray(leave.hours)) {
-              isCovered = leave.hours.includes(entry.hour);
-            }
+        if (status === "absent") {
+          const dateStr = format(
+            new Date(entry.year, entry.month - 1, entry.day),
+            "yyyy-MM-dd",
+          );
 
-            if (isCovered) {
-              const status = normalizeAttendance(
-                entry.final_attendance ||
-                  entry.user_attendance ||
-                  entry.teacher_attendance,
-              );
-              if (status === "absent") {
-                matchingAbsentCount++;
-              }
+          const leavesForDate = dutyLeavesByDate.get(dateStr);
+          if (leavesForDate) {
+            const coveringLeave = leavesForDate.find(
+              (leave) =>
+                leave.hours === "full_day" ||
+                (Array.isArray(leave.hours) &&
+                  leave.hours.includes(entry.hour)),
+            );
+
+            if (coveringLeave) {
+              matchingAbsentCount++;
+              map[coveringLeave.id] = true;
             }
           }
         }
@@ -926,54 +941,7 @@ export const DutyLeaveScreen: React.FC = () => {
       });
     }
 
-    return impacts;
-  }, [attendanceData, courseSchedule, dutyLeaves]);
-
-  const leaveCoverageMap = useMemo(() => {
-    const map: Record<string, boolean> = {};
-    if (!attendanceData || !courseSchedule) return map;
-
-    dutyLeaves.forEach((leave) => {
-      let isApplied = false;
-      const leaveDate = new Date(leave.date);
-      const leaveDay = leaveDate.getDate();
-      const leaveMonth = leaveDate.getMonth() + 1;
-      const leaveYear = leaveDate.getFullYear();
-
-      for (const subject of attendanceData.subjects) {
-        const records = courseSchedule.get(subject.subject.id.toString()) || [];
-        for (const entry of records) {
-          if (
-            entry.day === leaveDay &&
-            entry.month === leaveMonth &&
-            entry.year === leaveYear
-          ) {
-            let isCovered = false;
-            if (leave.hours === "full_day") {
-              isCovered = true;
-            } else if (Array.isArray(leave.hours)) {
-              isCovered = leave.hours.includes(entry.hour);
-            }
-
-            if (isCovered) {
-              const status = normalizeAttendance(
-                entry.final_attendance ||
-                  entry.user_attendance ||
-                  entry.teacher_attendance,
-              );
-              if (status === "absent") {
-                isApplied = true;
-                break;
-              }
-            }
-          }
-        }
-        if (isApplied) break;
-      }
-      map[leave.id] = isApplied;
-    });
-
-    return map;
+    return { subjectImpacts: impacts, leaveCoverageMap: map };
   }, [attendanceData, courseSchedule, dutyLeaves]);
 
   const [editingLeave, setEditingLeave] = useState<DutyLeave | null>(null);
