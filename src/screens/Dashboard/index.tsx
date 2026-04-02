@@ -62,7 +62,7 @@ export const Dashboard: React.FC = () => {
   const initPfp = usePfpStore((state) => state.initialize);
 
   const fetchAssignments = useAssignmentStore(
-    (state) => state.fetchAssignments
+    (state) => state.fetchAssignments,
   );
 
   useEffect(() => {
@@ -124,7 +124,7 @@ export const Dashboard: React.FC = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const stickyYRef = React.useRef(0);
   const [activeFilter, setActiveFilter] = useState<"year" | "semester" | null>(
-    null
+    null,
   );
   const [activeDisplayFilter, setActiveDisplayFilter] =
     useState<DisplayFilter>("all");
@@ -184,7 +184,7 @@ export const Dashboard: React.FC = () => {
         courseSchedule.get(subject.subject.id.toString()) || [];
       const enhancedStats = calculateEnhancedAttendanceStats(
         subject,
-        userRecords
+        userRecords,
       );
 
       return {
@@ -213,11 +213,11 @@ export const Dashboard: React.FC = () => {
 
     const totalClasses = enhancedSubjects.reduce(
       (sum, subject) => sum + subject.enhanced.totalClasses,
-      0
+      0,
     );
     const attendedClasses = enhancedSubjects.reduce(
       (sum, subject) => sum + subject.enhanced.attendedClasses,
-      0
+      0,
     );
     const percentage =
       totalClasses > 0 ? (attendedClasses / totalClasses) * 100 : 0;
@@ -257,7 +257,7 @@ export const Dashboard: React.FC = () => {
   const handleSubjectPress = (
     subject: any,
     canMiss: number,
-    classesToAttend: number
+    classesToAttend: number,
   ) => {
     navigation.navigate("SubjectDetails", {
       subjectId: subject.subject.id.toString(),
@@ -304,13 +304,13 @@ export const Dashboard: React.FC = () => {
   };
   // Categorize subjects based on enhanced status
   const dangerSubjects = enhancedSubjects.filter(
-    (s) => s.enhanced.status === "danger"
+    (s) => s.enhanced.status === "danger",
   );
   const warningSubjects = enhancedSubjects.filter(
-    (s) => s.enhanced.status === "warning"
+    (s) => s.enhanced.status === "warning",
   );
   const safeSubjects = enhancedSubjects.filter(
-    (s) => s.enhanced.status === "safe"
+    (s) => s.enhanced.status === "safe",
   );
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scaleAnim.value }],
@@ -336,7 +336,7 @@ export const Dashboard: React.FC = () => {
       scrollPastSticky,
       [0, animationRange],
       [0, 1],
-      Extrapolation.CLAMP
+      Extrapolation.CLAMP,
     );
     const animatedHeight = interpolate(progress, [0, 1], [filterInfoHeight, 0]);
     const animatedMargin = interpolate(progress, [0, 1], [16, 0]);
@@ -483,6 +483,28 @@ export const Dashboard: React.FC = () => {
               </View>
             </Animated.View>
           )}
+
+          <TouchableOpacity
+            style={styles.dutyLeaveButton}
+            onPress={() => navigation.navigate("DutyLeave")}
+            activeOpacity={0.7}
+          >
+            <View style={styles.dutyLeaveButtonIcon}>
+              <Ionicons name="document-text" size={20} color={colors.primary} />
+            </View>
+            <View style={styles.dutyLeaveButtonContent}>
+              <Text style={styles.dutyLeaveButtonTitle}>Duty Leave</Text>
+              <Text style={styles.dutyLeaveButtonSubtitle}>
+                Track & manage your duty leaves
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
           <View
             style={styles.stickyHeaderContainer}
             onLayout={(e) => {
@@ -1115,5 +1137,43 @@ const createStyles = (colors: ThemeColors) =>
     },
     checkmarkContainer: {
       marginLeft: 12,
+    },
+    dutyLeaveButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.primary + "25",
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    dutyLeaveButtonIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.primary + "14",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    dutyLeaveButtonContent: {
+      flex: 1,
+    },
+    dutyLeaveButtonTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    dutyLeaveButtonSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
     },
   });
