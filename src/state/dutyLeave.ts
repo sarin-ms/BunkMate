@@ -69,6 +69,9 @@ export const useDutyLeaveStore = create<DutyLeaveState>((set, get) => ({
 
       const newLeaves = [...currentLeaves];
       newLeaves[leaveIndex] = updatedLeave;
+      newLeaves.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
       set({ dutyLeaves: newLeaves });
     } catch (error: any) {
       set({ error: error.message || "Failed to update duty leave" });

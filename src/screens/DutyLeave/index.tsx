@@ -86,11 +86,11 @@ const AttendanceImpactCard: React.FC<{
       </View>
 
       <View style={{ marginTop: 8 }}>
-        {impacts.map((impact, idx) => {
+        {impacts.map((impact) => {
           const diff = impact.projectedPercentage - impact.currentPercentage;
           if (diff <= 0 && impact.matchingAbsentCount === 0) return null;
           return (
-            <View key={idx} style={styles.subjectImpactRow}>
+            <View key={impact.subjectName} style={styles.subjectImpactRow}>
               <Text style={styles.subjectImpactName} numberOfLines={1}>
                 {impact.subjectName}
               </Text>
