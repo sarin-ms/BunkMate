@@ -428,82 +428,91 @@ export const Dashboard: React.FC = () => {
           scrollEventThrottle={16}
           ref={scrollViewRef}
         >
-          {/* Overall Stats */}
-          {enhancedOverallStats && (
-            <Animated.View style={[styles.statsCardContainer, animatedStyle]}>
-              <View style={styles.statsGradientBanner}>
-                <Text style={styles.statsTitle}>Overall Attendance</Text>
+          <View>
+            {/* Overall Stats */}
+            {enhancedOverallStats && (
+              <Animated.View style={[styles.statsCardContainer, animatedStyle]}>
+                <View style={styles.statsGradientBanner}>
+                  <Text style={styles.statsTitle}>Overall Attendance</Text>
+                  <Ionicons
+                    name={getOverallStatusIcon()}
+                    size={24}
+                    color={styles.textSecondary.color}
+                  />
+                </View>
+
+                <View style={styles.statsCard}>
+                  <View style={styles.statsContent}>
+                    <Text
+                      style={[
+                        styles.overallPercentage,
+                        getOverallStatusColor(),
+                      ]}
+                    >
+                      {formatPercentage(enhancedOverallStats.percentage)}
+                    </Text>
+                    <Text style={styles.totalSubjects}>
+                      {enhancedOverallStats.totalSubjects} subjects
+                    </Text>
+
+                    {lastUpdated && (
+                      <Text style={styles.lastUpdated}>
+                        Last updated: {getTimeAgo(lastUpdated)}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={styles.statusCounts}>
+                    <View style={styles.statusCountItem}>
+                      <Text style={[styles.statusCount, styles.dangerText]}>
+                        {dangerSubjects.length}
+                      </Text>
+                      <Text style={styles.statusLabel}>Critical</Text>
+                    </View>
+
+                    <View style={styles.statusCountItem}>
+                      <Text style={[styles.statusCount, styles.warningText]}>
+                        {warningSubjects.length}
+                      </Text>
+                      <Text style={styles.statusLabel}>Warning</Text>
+                    </View>
+
+                    <View style={styles.statusCountItem}>
+                      <Text style={[styles.statusCount, styles.safeText]}>
+                        {safeSubjects.length}
+                      </Text>
+                      <Text style={styles.statusLabel}>Safe</Text>
+                    </View>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+
+            <TouchableOpacity
+              style={styles.dutyLeaveButton}
+              onPress={() => navigation.navigate("DutyLeave")}
+              activeOpacity={0.7}
+            >
+              <View style={styles.dutyLeaveButtonIcon}>
                 <Ionicons
-                  name={getOverallStatusIcon()}
-                  size={24}
-                  color={styles.textSecondary.color}
+                  name="document-text"
+                  size={20}
+                  color={colors.primary}
                 />
               </View>
-
-              <View style={styles.statsCard}>
-                <View style={styles.statsContent}>
-                  <Text
-                    style={[styles.overallPercentage, getOverallStatusColor()]}
-                  >
-                    {formatPercentage(enhancedOverallStats.percentage)}
-                  </Text>
-                  <Text style={styles.totalSubjects}>
-                    {enhancedOverallStats.totalSubjects} subjects
-                  </Text>
-
-                  {lastUpdated && (
-                    <Text style={styles.lastUpdated}>
-                      Last updated: {getTimeAgo(lastUpdated)}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.statusCounts}>
-                  <View style={styles.statusCountItem}>
-                    <Text style={[styles.statusCount, styles.dangerText]}>
-                      {dangerSubjects.length}
-                    </Text>
-                    <Text style={styles.statusLabel}>Critical</Text>
-                  </View>
-
-                  <View style={styles.statusCountItem}>
-                    <Text style={[styles.statusCount, styles.warningText]}>
-                      {warningSubjects.length}
-                    </Text>
-                    <Text style={styles.statusLabel}>Warning</Text>
-                  </View>
-
-                  <View style={styles.statusCountItem}>
-                    <Text style={[styles.statusCount, styles.safeText]}>
-                      {safeSubjects.length}
-                    </Text>
-                    <Text style={styles.statusLabel}>Safe</Text>
-                  </View>
-                </View>
+              <View style={styles.dutyLeaveButtonContent}>
+                <Text style={styles.dutyLeaveButtonTitle}>Duty Leave</Text>
+                <Text style={styles.dutyLeaveButtonSubtitle}>
+                  Track & manage your duty leaves
+                </Text>
               </View>
-            </Animated.View>
-          )}
-
-          <TouchableOpacity
-            style={styles.dutyLeaveButton}
-            onPress={() => navigation.navigate("DutyLeave")}
-            activeOpacity={0.7}
-          >
-            <View style={styles.dutyLeaveButtonIcon}>
-              <Ionicons name="document-text" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.dutyLeaveButtonContent}>
-              <Text style={styles.dutyLeaveButtonTitle}>Duty Leave</Text>
-              <Text style={styles.dutyLeaveButtonSubtitle}>
-                Track & manage your duty leaves
-              </Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
 
           <View
             style={styles.stickyHeaderContainer}
