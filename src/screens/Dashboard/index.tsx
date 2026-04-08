@@ -488,30 +488,6 @@ export const Dashboard: React.FC = () => {
               </Animated.View>
             )}
 
-            <TouchableOpacity
-              style={styles.dutyLeaveButton}
-              onPress={() => navigation.navigate("DutyLeave")}
-              activeOpacity={0.7}
-            >
-              <View style={styles.dutyLeaveButtonIcon}>
-                <Ionicons
-                  name="document-text"
-                  size={20}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.dutyLeaveButtonContent}>
-                <Text style={styles.dutyLeaveButtonTitle}>Duty Leave</Text>
-                <Text style={styles.dutyLeaveButtonSubtitle}>
-                  Track & manage your duty leaves
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
           </View>
 
           <View
@@ -1146,43 +1122,5 @@ const createStyles = (colors: ThemeColors) =>
     },
     checkmarkContainer: {
       marginLeft: 12,
-    },
-    dutyLeaveButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginHorizontal: 16,
-      marginBottom: 8,
-      borderWidth: 1,
-      borderColor: colors.primary + "25",
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 3,
-      elevation: 1,
-    },
-    dutyLeaveButtonIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
-      backgroundColor: colors.primary + "14",
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 12,
-    },
-    dutyLeaveButtonContent: {
-      flex: 1,
-    },
-    dutyLeaveButtonTitle: {
-      fontSize: 15,
-      fontWeight: "600",
-      color: colors.text,
-    },
-    dutyLeaveButtonSubtitle: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
     },
   });

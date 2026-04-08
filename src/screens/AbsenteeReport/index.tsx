@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import {
   startOfMonth,
   endOfMonth,
@@ -29,6 +31,7 @@ import { ThemeColors } from "../../types/theme";
 import { normalizeAttendance } from "../../utils/helpers";
 import { Subject } from "../../types/api";
 import { TAB_BAR_HEIGHT } from "../../constants/config";
+import { RootStackParamList } from "../../navigation/RootNavigator";
 import Text from "../../components/UI/Text";
 import Animated, {
   Easing,
@@ -45,6 +48,11 @@ const AnimatedTouchableOpacity =
   Animated.createAnimatedComponent(TouchableOpacity);
 
 const AnimatedIonicons = Animated.createAnimatedComponent(Ionicons);
+
+type ReportNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "MainTabs"
+>;
 
 const ToPdfBtn = ({
   selectedDates,
@@ -125,6 +133,7 @@ export const AbsenteeReportScreen: React.FC = () => {
   const styles = useThemedStyles(createStyles);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation<ReportNavigationProp>();
 
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [reportData, setReportData] = useState<DateReport[]>([]);
@@ -292,6 +301,27 @@ export const AbsenteeReportScreen: React.FC = () => {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Absentee Report</Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.dutyLeaveButton}
+        onPress={() => navigation.navigate("DutyLeave")}
+        activeOpacity={0.7}
+      >
+        <View style={styles.dutyLeaveButtonIcon}>
+          <Ionicons name="calendar" size={22} color={colors.primary} />
+        </View>
+        <View style={styles.dutyLeaveButtonContent}>
+          <Text style={styles.dutyLeaveButtonTitle}>Duty Leave</Text>
+          <Text style={styles.dutyLeaveButtonSubtitle}>
+            Add and manage your duty leave(s).
+          </Text>
+        </View>
+        <Ionicons
+          name="chevron-forward"
+          size={20}
+          color={colors.textSecondary}
+        />
+      </TouchableOpacity>
 
       <View style={styles.dateSelector}>
         <Text style={styles.dateSelectorLabel}>Showing report for:</Text>
@@ -516,6 +546,44 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: 24,
       fontWeight: "bold",
       color: colors.text,
+    },
+    dutyLeaveButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginHorizontal: 20,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.primary + "25",
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    dutyLeaveButtonIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: colors.primary + "14",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+    },
+    dutyLeaveButtonContent: {
+      flex: 1,
+    },
+    dutyLeaveButtonTitle: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.text,
+    },
+    dutyLeaveButtonSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
     },
     dateSelector: {
       paddingHorizontal: 20,

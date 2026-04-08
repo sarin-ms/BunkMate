@@ -44,10 +44,30 @@ export class DutyLeaveDatabase {
           const data = await database.get(key);
           if (data) {
             const leave = JSON.parse(data) as DutyLeave;
+            let shouldPersistNormalizedLeave = false;
+
             if (leave.hours === undefined) {
               leave.hours = "full_day";
+              shouldPersistNormalizedLeave = true;
+            } else if (Array.isArray(leave.hours)) {
+              const normalizedHours = leave.hours
+                .map((hour) => Number(hour))
+                .filter((hour) => Number.isFinite(hour) && hour > 0)
+                .sort((a, b) => a - b);
+
+              if (
+                normalizedHours.length !== leave.hours.length ||
+                normalizedHours.some((hour, index) => hour !== leave.hours[index])
+              ) {
+                leave.hours = normalizedHours;
+                shouldPersistNormalizedLeave = true;
+              }
+            }
+
+            if (shouldPersistNormalizedLeave) {
               await database.set(key, JSON.stringify(leave));
             }
+
             leaves.push(leave);
           }
         } catch (parseError) {

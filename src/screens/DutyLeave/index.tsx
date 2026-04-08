@@ -32,11 +32,7 @@ import {
   isSameMonth,
   parseISO,
 } from "date-fns";
-import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import * as Sharing from "expo-sharing";
-import * as IntentLauncher from "expo-intent-launcher";
-import * as FileSystem from "expo-file-system/legacy";
 
 import { useThemedStyles, useTheme } from "../../hooks/useTheme";
 import { useAttendanceStore } from "../../state/attendance";
@@ -145,32 +141,15 @@ const DutyLeaveCard: React.FC<{
   const handleOpenDocument = async () => {
     if (!leave.documentUri) return;
 
-    if (leave.documentType === "image") {
-      setImagePreviewVisible(true);
-    } else {
-      try {
-        if (Platform.OS === "android") {
-          const contentUri = await FileSystem.getContentUriAsync(
-            leave.documentUri,
-          );
-          await IntentLauncher.startActivityAsync(
-            "android.intent.action.VIEW",
-            {
-              data: contentUri,
-              flags: 1,
-              type: "application/pdf",
-            },
-          );
-        } else {
-          await Sharing.shareAsync(leave.documentUri, {
-            mimeType: "application/pdf",
-            dialogTitle: leave.documentName || "Open Document",
-          });
-        }
-      } catch (error) {
-        Alert.alert("Error", "Could not open the document.");
-      }
+    if (leave.documentType === "pdf") {
+      Alert.alert(
+        "Unsupported Attachment",
+        "This app version supports duty leave image attachments only.",
+      );
+      return;
     }
+
+    setImagePreviewVisible(true);
   };
 
   const handleDelete = () => {
@@ -481,8 +460,13 @@ const AddDutyLeaveModal: React.FC<{
         setIsFullDay(true);
         setSelectedHours([]);
       } else {
+        const normalizedHours = editingLeave.hours
+          .map((hour) => Number(hour))
+          .filter((hour) => Number.isFinite(hour) && hour > 0)
+          .sort((a, b) => a - b);
+
         setIsFullDay(false);
-        setSelectedHours([...editingLeave.hours]);
+        setSelectedHours([...new Set(normalizedHours)]);
       }
     }
   }, [editingLeave, visible]);
@@ -501,25 +485,6 @@ const AddDutyLeaveModal: React.FC<{
   const handleClose = () => {
     resetForm();
     onClose();
-  };
-
-  const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/*"],
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        const isPdf = asset.mimeType?.includes("pdf");
-        setDocumentUri(asset.uri);
-        setDocumentName(asset.name);
-        setDocumentType(isPdf ? "pdf" : "image");
-      }
-    } catch (error) {
-      console.error("Error picking document:", error);
-    }
   };
 
   const handlePickImage = async () => {
@@ -571,7 +536,12 @@ const AddDutyLeaveModal: React.FC<{
         documentUri: savedDocUri,
         documentName,
         documentType,
-        hours: isFullDay ? "full_day" : selectedHours,
+        hours: isFullDay
+          ? "full_day"
+          : [...new Set(selectedHours)]
+              .map((hour) => Number(hour))
+              .filter((hour) => Number.isFinite(hour) && hour > 0)
+              .sort((a, b) => a - b),
         approved: editingLeave ? editingLeave.approved : false,
       });
       handleClose();
@@ -728,9 +698,9 @@ const AddDutyLeaveModal: React.FC<{
                   textAlignVertical="top"
                 />
 
-                {/* Document Upload */}
+                {/* Image Upload */}
                 <Text style={styles.fieldLabel}>
-                  Document{" "}
+                  Image{" "}
                   <Text style={{ color: colors.textSecondary }}>
                     (optional)
                   </Text>
@@ -769,29 +739,15 @@ const AddDutyLeaveModal: React.FC<{
                   <View style={styles.uploadButtonsRow}>
                     <TouchableOpacity
                       style={styles.uploadButton}
-                      onPress={handlePickDocument}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons
-                        name="document-attach-outline"
-                        size={22}
-                        color={colors.primary}
-                      />
-                      <Text style={styles.uploadButtonText}>
-                        Pick PDF / Image
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.uploadButton}
                       onPress={handlePickImage}
                       activeOpacity={0.7}
                     >
                       <Ionicons
-                        name="camera-outline"
+                        name="images-outline"
                         size={22}
                         color={colors.primary}
                       />
-                      <Text style={styles.uploadButtonText}>Gallery</Text>
+                      <Text style={styles.uploadButtonText}>Choose Image</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -905,11 +861,19 @@ export const DutyLeaveScreen: React.FC = () => {
 
           const leavesForDate = dutyLeavesByDate.get(dateStr);
           if (leavesForDate) {
+            const entryHour = Number(entry.hour);
             const coveringLeave = leavesForDate.find(
-              (leave) =>
-                leave.hours === "full_day" ||
-                (Array.isArray(leave.hours) &&
-                  leave.hours.includes(entry.hour)),
+              (leave) => {
+                if (leave.hours === "full_day") {
+                  return true;
+                }
+
+                if (!Array.isArray(leave.hours) || !Number.isFinite(entryHour)) {
+                  return false;
+                }
+
+                return leave.hours.some((hour) => Number(hour) === entryHour);
+              },
             );
 
             if (coveringLeave) {
